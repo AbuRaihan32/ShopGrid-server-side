@@ -31,12 +31,22 @@ async function run() {
     app.get("/products", async (req, res) => {
       const page = parseInt(req.query.page);
       const size = parseInt(req.query.size);
+      const searchText = req.query.searchText;
+
       const result = await productsCollection
-        .find()
+        .find({
+          productName: { $regex: searchText, $options: "i" },
+        })
         .skip(page * size)
         .limit(size)
         .toArray();
-      res.send(result);
+
+      // Total products count for the query
+      const totalProducts = await productsCollection.countDocuments({
+        productName: { $regex: searchText, $options: "i" },
+      });
+
+      res.send({result, pageNum: Math.ceil(totalProducts / size)});
     });
 
     // ! get products Count
