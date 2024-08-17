@@ -27,26 +27,36 @@ async function run() {
 
     const productsCollection = client.db("ShopGridDB").collection("products");
 
-    // ! get Products
+    // Get Products
     app.get("/products", async (req, res) => {
-      const page = parseInt(req.query.page);
-      const size = parseInt(req.query.size);
-      const searchText = req.query.searchText;
+      try {
+        const page = isNaN(parseInt(req.query.page)) ? 0 : parseInt(req.query.page);
+        const size = isNaN(parseInt(req.query.size)) ? 10 : parseInt(req.query.size);
+        const searchText = req.query.searchText || "";
+        const brandFilter = req.query.brand || "";
+        const categoryFilter = req.query.category || "";
+        const minPrice = parseFloat(req.query.min) || 0;
+        const maxPrice = parseFloat(req.query.max) || Infinity;
 
-      const result = await productsCollection
-        .find({
+        const query = {
           productName: { $regex: searchText, $options: "i" },
-        })
-        .skip(page * size)
-        .limit(size)
-        .toArray();
+          brandName: brandFilter ? brandFilter : { $exists: true },
+          category: categoryFilter ? categoryFilter : { $exists: true },
+          price: { $gte: minPrice, $lte: maxPrice },
+        };
 
-      // Total products count for the query
-      const totalProducts = await productsCollection.countDocuments({
-        productName: { $regex: searchText, $options: "i" },
-      });
+        const products = await productsCollection
+          .find(query)
+          .skip(page * size)
+          .limit(size)
+          .toArray();
 
-      res.send({result, pageNum: Math.ceil(totalProducts / size)});
+        const totalProducts = await productsCollection.countDocuments(query);
+
+        res.send({ result: products, pageNum: Math.ceil(totalProducts / size) });
+      } catch (error) {
+        res.status(500).send({ error: 'Failed to fetch products' });
+      }
     });
 
     // ! get products Count
